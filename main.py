@@ -3,8 +3,7 @@ from dataset.dataloader import KGDataset, OriginDataset
 DATASET = 'FB15k-237'
 
 # dataset = KGDataset(dataset=DATASET, load_from_txt=False)
-dataset = OriginDataset('FB15k-237', load_from_txt=False, load_dict=True)
-dataset.load_from_disk()
+dataset = OriginDataset('FB15k-237', load_from_disk=True)
 # print(dataset.num_relation)
 # print(dataset.num_entity)
 e1 = dataset.get_idx('/m/027rn', label='entity')

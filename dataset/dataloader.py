@@ -5,30 +5,30 @@ import os
 
 
 class KGDataset():
-    def __init__(self, dataset, delimiter='\t', load_from_txt=True, load_dict=False):
+    def __init__(self, dataset, delimiter='\t', load_from_disk=False):
         self.delimiter = delimiter
         self.dataset = dataset
         self.num_entity = 0
         self.num_relation = 0
         self.filter_node = {}
-        if load_from_txt:
-            self.data = self.read_data()
-            print('processing data...')
-            self.entity2idx, self.idx2entity = self.token_dict(label='entity')
-            self.rel2idx, self.idx2rel = self.token_dict(label='relation')
-            print('saving data to disk...')
-            self.save_to_disk()
-        else:
-            print("Need to load data from disk! Use load_from_disk().")
-            self.entity2idx = {}
-            self.rel2idx = {}
-            self.idx2entity = {}
-            self.idx2rel = {}
-        if load_dict:
-            if not os.path.exists(f"./dataset/{self.dataset}/filter_node"):
-                print("filter_node file not found!")
+        self.entity2idx = {}
+        self.rel2idx = {}
+        self.idx2entity = {}
+        self.idx2rel = {}
+        if load_from_disk:
+            if os.path.exists(f"./dataset/{self.dataset}/dict_data"):
+                print('loading dict data...')
+                self.load_from_disk()
             else:
-                self.filter_node = pickle.load(open(f"./dataset/{self.dataset}/filter_node", 'rb'))
+                print('Error: Can not find dict_data file!')
+        # else:
+        #     self.data = self.read_data()
+        #     print('Processing data...')
+        #     self.entity2idx, self.idx2entity = self.token_dict(label='entity')
+        #     self.rel2idx, self.idx2rel = self.token_dict(label='relation')
+        #     print('saving data to disk...')
+        #     self.save_to_disk()
+
 
     # 从原始数据集中加载数据
     def read_data(self):
@@ -94,11 +94,10 @@ class KGDataset():
 
     # 从本地存储中载入字典信息, 同时需要计算entity和relation的数量, 返回bool
     def load_from_disk(self, path='!'):
-        print('loading data...')
         if path == '!':
             path = f"./dataset/{self.dataset}/dict_data"
         if not os.path.exists(path):
-            print("no local disk file!")
+            print("Error: Can not find dict_data file!")
             return False
         self.entity2idx, self.rel2idx, self.idx2entity, self.idx2rel = pickle.load(open(path, 'rb'))
         self.num_entity = len(self.entity2idx)
@@ -109,23 +108,32 @@ class KGDataset():
     def save_to_disk(self, path='!'):
         if path == '!':
             path = f"./dataset/{self.dataset}/dict_data"
+        else:
+            path = os.path.join(path, 'dict_data')
+        print('saving dict data...')
         pickle.dump([self.entity2idx, self.rel2idx, self.idx2entity, self.idx2rel], open(path, 'wb'))
-        if self.filter_node:
-            print(f"saving filter_node dict...")
-            pickle.dump(self.filter_node, open(f"./dataset/{self.dataset}/filter_node", 'wb'))
 
 
 class OriginDataset(KGDataset):
-    def __init__(self, dataset, delimiter='\t', load_from_txt=True, load_dict=False):
-        super().__init__(dataset, delimiter, load_from_txt=False, load_dict=load_dict)
-        if load_from_txt:
+    def __init__(self, dataset, delimiter='\t', load_from_disk=False):
+        super().__init__(dataset, delimiter, load_from_disk=load_from_disk)
+        if load_from_disk:
+            if os.path.exists(f"./dataset/{self.dataset}/filter_node"):
+                print('loading filter node...')
+                self.filter_node = pickle.load(open(f"./dataset/{self.dataset}/filter_node", 'rb'))
+            else:
+                print('Error: Can not find filter_node file!')
+        else:
             self.data = self.read_data()
             print('processing data...')
+            print('generating token dict map...')
             self.entity2idx, self.idx2entity = self.token_dict(label='entity')
             self.rel2idx, self.idx2rel = self.token_dict(label='relation')
-            print('saving data to disk...')
+            print('generating filter node...')
+            self.generate_filter_node()
             self.save_to_disk()
 
+    # 由于数据集具有train, valid, test三个数据文件，因此重载read_data方法
     def read_data(self):
         data = np.zeros(shape=(1, 3))
         files = ['train.txt', 'valid.txt', 'test.txt']
@@ -135,6 +143,18 @@ class OriginDataset(KGDataset):
         data = data[1:]
         print(f"Total samples number: {data.shape[0]}")
         return data
+
+    # 由于存在filter_node文件，因此需要重载save_to_disk方法
+    def save_to_disk(self, path='!'):
+        if path == '!':
+            path = f"./dataset/{self.dataset}/dict_data"
+        else:
+            path = os.path.join(path, 'dict_data')
+        print('saving dict data...')
+        pickle.dump([self.entity2idx, self.rel2idx, self.idx2entity, self.idx2rel], open(path, 'wb'))
+        if self.filter_node:
+            print("saving filter_node dict...")
+            pickle.dump(self.filter_node, open(f"./dataset/{self.dataset}/filter_node", 'wb'))
 
     # 将三元组（h, r, t）信息添加到self.filter_node中
     def add_filter_node(self, e1, rel, e2):
