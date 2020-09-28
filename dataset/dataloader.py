@@ -6,6 +6,9 @@ import os
 
 class KGDataset():
     def __init__(self, dataset, delimiter='\t', load_from_disk=False):
+        if not os.path.exists(f"./dataset/{dataset}"):
+            print('Error: Can not find Dataset directory!')
+            exit(1)
         self.delimiter = delimiter
         self.dataset = dataset
         self.num_entity = 0
@@ -28,7 +31,6 @@ class KGDataset():
         #     self.rel2idx, self.idx2rel = self.token_dict(label='relation')
         #     print('saving data to disk...')
         #     self.save_to_disk()
-
 
     # 从原始数据集中加载数据
     def read_data(self):
@@ -100,8 +102,8 @@ class KGDataset():
             print("Error: Can not find dict_data file!")
             return False
         self.entity2idx, self.rel2idx, self.idx2entity, self.idx2rel = pickle.load(open(path, 'rb'))
-        self.num_entity = len(self.entity2idx)
-        self.num_relation = len(self.rel2idx)
+        self.num_entity = len(self.entity2idx)-2
+        self.num_relation = len(self.rel2idx)-2
         return True
 
     # 将字典信息储存到本地存储
@@ -117,6 +119,9 @@ class KGDataset():
 class OriginDataset(KGDataset):
     def __init__(self, dataset, delimiter='\t', load_from_disk=False):
         super().__init__(dataset, delimiter, load_from_disk=load_from_disk)
+        self.train = None
+        self.valid = None
+        self.test = None
         if load_from_disk:
             if os.path.exists(f"./dataset/{self.dataset}/filter_node"):
                 print('loading filter node...')
@@ -145,7 +150,7 @@ class OriginDataset(KGDataset):
         return data
 
     # 由于存在filter_node文件，因此需要重载save_to_disk方法
-    def save_to_disk(self, path='!'):
+    def save_to_disk(self, path='!', save_data=False):
         if path == '!':
             path = f"./dataset/{self.dataset}/dict_data"
         else:
@@ -174,8 +179,8 @@ class OriginDataset(KGDataset):
     def generate_filter_node(self):
         train_data = np.loadtxt(f"./dataset/{self.dataset}/train.txt", dtype=np.str, delimiter=self.delimiter)
         for triple in train_data:
-            e1, rel, e2 = np.hsplit(triple, 3)
-            e1, rel, e2 = self.get_idx(e1[0], label='entity'), self.get_idx(rel[0], label='relation'), self.get_idx(e2[0], label='entity')
+            e1, rel, e2 = self.get_idx(triple[0], label='entity'), self.get_idx(triple[1], label='relation'), \
+                          self.get_idx(triple[2], label='entity')
             # 因为知识图谱为无向图，所以三元组的两种链接方向都需要添加
             self.add_filter_node(e1, rel, e2)
             self.add_filter_node(e2, rel, e1)
@@ -188,3 +193,32 @@ class OriginDataset(KGDataset):
             return 'Wrong relation!'
         else:
             return self.filter_node[e1][rel]
+
+    # 生成one-hot类型的标签
+    def label_matrix(self, label):
+        tensor = np.zeros((len(label), self.num_entity+2))
+        for i in range(len(label)):
+            idx = label[i]
+            tensor[i][idx] = 1
+        return tensor
+
+    # 返回转换为idx的数据集, 标签返回为one-hot编码的矩阵, type可选'trian', 'valid', 'test'
+    def get_dataset(self, type):
+        path = f"./dataset/{self.dataset}/{type}.txt"
+        if not os.path.exists(path):
+            print(f"Error: Can not find {type} data!")
+            exit(1)
+        data_tmp = np.loadtxt(path, dtype=np.str, delimiter=self.delimiter)
+        data_ = np.array([[self.get_idx(triple[0], label='entity'), self.get_idx(triple[1], label='relation')]
+                          for triple in data_tmp])
+        label_ = np.array([self.get_idx(triple[2], label='entity') for triple in data_tmp])
+        label_ = self.label_matrix(label_)
+        return data_, label_
+
+
+# class my_dataset(OriginDataset):
+#     def __init__(self, dataset, delimiter='\t', load_from_disk=False):
+#         super().__init__(self, dataset=dataset, delimiter=delimiter, load_from_disk=load_from_disk)
+#
+#     def get_feature(self):
+#         feature = np.zeros(shape=(self.num_entity))
