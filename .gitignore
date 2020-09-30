@@ -130,3 +130,9 @@ dmypy.json
 
 # Pycharm
 .idea/
+
+# process file
+dataset/FB15k-237/dict_data
+dataset/FB15k-237/feature
+dataset/FB15k-237/filter_node
+dataset/FB15k-237/triple_data
