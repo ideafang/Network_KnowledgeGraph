@@ -334,6 +334,18 @@ class IdeaDataset(OriginDataset):
                     relation_feature[rel][e2] = self.rel_dict[e2]
         return relation_feature
 
+    # 获取relation的邻接矩阵
+    def get_rel_matricx(self):
+        rm = np.zeros(shape=(self.num_relation, self.num_relation), dtype=np.int)
+        for r1 in self.rel_feature.keys():
+            for e in self.rel_feature[r1].keys():
+                for r2 in self.entity_feature[e].keys():
+                    if rm[r1][r2] == 0:
+                        rm[r1][r2] = 1
+                    if rm[r2][r1] == 0:
+                        rm[r2][r1] = 1
+        return rm
+
     # 保存feature data
     def save_feature(self, path='!'):
         if path == '!':
