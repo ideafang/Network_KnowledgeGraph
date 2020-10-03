@@ -7,9 +7,10 @@ from torch.nn import functional as F
 init_emb_size = 200
 gc1_emb_size = 200
 emb_dim = 100
-conv1_size = 1024
-conv2_size = 256
+conv1_size = 64
+conv2_size = 128
 conv3_size = 64
+fc_size = 64*23
 
 
 
@@ -36,8 +37,8 @@ class GraphConvolution(nn.Module):
             self.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, input, adj):
-        support = torch.matmul(input, self.weight)
-        output = torch.matmul(adj, support)
+        support = torch.mm(input, self.weight)
+        output = torch.mm(adj, support)
         if self.bias is not None:
             return output + self.bias
         else:
@@ -64,7 +65,7 @@ class IdeaModel(nn.Module):
         self.bn3 = nn.BatchNorm1d(gc1_emb_size)
         self.bn4 = nn.BatchNorm1d(emb_dim)
 
-        self.conv1 = nn.Conv1d(in_channels=num_entity+num_relation, out_channels=conv1_size, kernel_size=1)
+        self.conv1 = nn.Conv1d(in_channels=2, out_channels=conv1_size, kernel_size=1)
         self.bn5 = nn.BatchNorm1d(conv1_size)
         self.drop1 = nn.Dropout(p=0.5)
         self.conv2 = nn.Conv1d(in_channels=conv1_size, out_channels=conv2_size, kernel_size=3)
@@ -72,30 +73,39 @@ class IdeaModel(nn.Module):
         self.drop2 = nn.Dropout(p=0.5)
         self.pool1 = nn.MaxPool1d(kernel_size=2)
         self.conv3 = nn.Conv1d(in_channels=conv2_size, out_channels=conv3_size, kernel_size=3)
-        self.bn7 = nn.BatchNorm1d(conv2_size)
+        self.bn7 = nn.BatchNorm1d(conv3_size)
         self.drop3 = nn.Dropout(p=0.5)
         self.pool2 = nn.MaxPool1d(kernel_size=2)
+        self.fc1 = nn.Linear(in_features=fc_size, out_features=num_entity)
+
+        self.loss = torch.nn.MSELoss()
         
 
     def init(self):
         xavier_normal_(self.emb_e.weight.data)
         xavier_normal_(self.emb_r.weight.data)
-        xavier_normal_(self.gc1.weight.data)
-        xavier_normal_(self.gc2.weight.data)
+        xavier_normal_(self.gc_e1.weight.data)
+        xavier_normal_(self.gc_e2.weight.data)
+        xavier_normal_(self.gc_r1.weight.data)
+        xavier_normal_(self.gc_r2.weight.data)
 
-    def forward(self, e1, rel, adj, rm):
-        e = self.emb_e(e1)
+    def forward(self, e1, rel, X_e, X_r, adj, rm):
+        e = self.emb_e(X_e)
         e = self.bn1(self.gc_e1(e, adj))
         e = F.relu(e)
         e = self.bn2(self.gc_e2(e, adj))
         e = F.relu(e)
+        e = e[e1]
+        e = e.unsqueeze(1)
 
 
-        r = self.emb_r(rel)
+        r = self.emb_r(X_r)
         r = self.bn3(self.gc_r1(r, rm))
         r = F.relu(r)
         r = self.bn4(self.gc_r2(r, rm))
         r = F.relu(r)
+        r = r[rel]
+        r = r.unsqueeze(1)
 
         # x = torch.cat([e, r], dim=1).unsqueeze(1)
         x = torch.cat([e, r], dim=1)
@@ -109,6 +119,11 @@ class IdeaModel(nn.Module):
         x = F.relu(x)
         x = self.drop3(self.pool2(x))
         x = x.view(x.size(0), -1)
+        x = self.fc1(x)
+        pred = F.softmax(x)
+
+        return pred
+
 
 
 

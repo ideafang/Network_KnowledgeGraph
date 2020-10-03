@@ -9,12 +9,13 @@ import torch.nn.functional as F
 # 构建一个torch.utils.data.Dataset类型的数据集， data_name为数据集名称， label可选train, valid, test
 # e1和rel均为int，label为长度为num_entity的list，目标e2索引的值为1，其余为0（类似one-hot）
 class MyDataset(Dataset):
-    def __init__(self, data_name, delimiter='\t', label='train', load_from_disk=False):
+    def __init__(self, data_name, delimiter='\t', type='train', load_from_disk=False):
         if not os.path.exists(f"./dataset/{data_name}"):
             print("Error: data_name not exist!")
             exit(-1)
+        self.type = type
         self.data = IdeaDataset(data_name, delimiter=delimiter, load_from_disk=load_from_disk)
-        self.e1, self.rel, self.label = self.data.get_dataset(type=label)
+        self.e1, self.rel, self.label = self.data.get_dataset(type=type)
         # self.adj_matricx = self.data.get_adj_matricx()
         # self.num_entity = self.data.num_entity
         # self.num_relation = self.data.num_relation
@@ -25,6 +26,9 @@ class MyDataset(Dataset):
     def __getitem__(self, item):
         sample = {'entity': self.e1[item], 'relation': self.rel[item], 'label': self.label[item]}
         return sample
+
+    def get_label(self):
+        return self.data.filter_node[self.type]
 
 
 class KGDataset():
@@ -253,6 +257,7 @@ class OriginDataset(KGDataset):
             label_[i][self.filter_node[type][e1][rel]] = 1
         entity_ = torch.tensor(entity_)
         rel_ = torch.tensor(rel_)
+        label_ = torch.tensor(label_)
         return entity_, rel_, label_
         # data_tmp = self.triple[type]
         # data_ = np.array([[self.get_idx(triple[0], label='entity'), self.get_idx(triple[1], label='relation')]
@@ -271,7 +276,7 @@ class OriginDataset(KGDataset):
                 matricx[e1][e2] = 1
             if matricx[e2][e1] == 0:
                 matricx[e2][e1] = 1
-        return matricx
+        return torch.tensor(matricx)
 
 
 
@@ -344,7 +349,7 @@ class IdeaDataset(OriginDataset):
                         rm[r1][r2] = 1
                     if rm[r2][r1] == 0:
                         rm[r2][r1] = 1
-        return rm
+        return torch.tensor(rm)
 
     # 保存feature data
     def save_feature(self, path='!'):
