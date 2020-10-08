@@ -27,19 +27,19 @@ def num_true(batch_pred, label_dict, e, r):
 
 
 DATASET = 'FB15k-237'
-epochs = 10
-lr = 0.001
+epochs = 5
+lr = 0.002
 l2 = 0.00
 
-train_dataset = MyDataset(DATASET, type='train', load_from_disk=False)
+dataset = MyDataset(DATASET, label='train', load_from_disk=True)
 # num_true方法需要使用label_dict
-label_dict = train_dataset.get_label()
-train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
+label_dict = dataset.get_label()
+train_loader = DataLoader(dataset, batch_size=128, shuffle=True)
 print('getting adj_matricx...')
-adj_matricx = train_dataset.data.get_adj_matricx().float().cuda()
+adj_matricx = dataset.data.get_adj_matricx().float().cuda()
 print('getting rel_matricx...')
-rel_matricx = train_dataset.data.get_rel_matricx().float().cuda()
-num_entity, num_relation = train_dataset.data.num_entity, train_dataset.data.num_relation
+rel_matricx = dataset.data.get_rel_matricx().float().cuda()
+num_entity, num_relation = dataset.data.num_entity, dataset.data.num_relation
 
 X_e = torch.LongTensor([i for i in range(num_entity)]).cuda()
 X_r = torch.LongTensor([i for i in range(num_relation)]).cuda()
@@ -59,6 +59,8 @@ for epoch in range(epochs):
     for i, sample in enumerate(train_loader):
         e = sample['entity']
         r = sample['relation']
+        #         e = F.one_hot(sample['entity'])
+        #         r = F.one_hot(sample['relation'])
         label = sample['label'].float().cuda()
         e.cuda()
         r.cuda()
@@ -71,9 +73,4 @@ for epoch in range(epochs):
         epoch_loss += loss
     train_acc = float(true_num) / float(total_num)
     print(f"epoch: {epoch+1}, train_loss: {epoch_loss}, train_acc: {train_acc}")
-
-    # 验证&测试
-    model.eval()
-    with torch.no_grad():
-        pass
 

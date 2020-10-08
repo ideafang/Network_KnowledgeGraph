@@ -78,7 +78,7 @@ class IdeaModel(nn.Module):
         self.pool2 = nn.MaxPool1d(kernel_size=2)
         self.fc1 = nn.Linear(in_features=fc_size, out_features=num_entity)
 
-        self.loss = torch.nn.MSELoss()
+        self.loss = torch.nn.CrossEntropyLoss()
         
 
     def init(self):
@@ -119,8 +119,7 @@ class IdeaModel(nn.Module):
         x = F.relu(x)
         x = self.drop3(self.pool2(x))
         x = x.view(x.size(0), -1)
-        x = self.fc1(x)
-        pred = F.softmax(x)
+        pred = self.fc1(x)
 
         return pred
 
