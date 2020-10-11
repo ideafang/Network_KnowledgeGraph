@@ -1,5 +1,5 @@
 from dataset.dataloader import MyDataset
-from model import IdeaModel
+from model import IdeaModel, SACN
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -27,18 +27,18 @@ def num_true(batch_pred, label_dict, e, r):
 
 
 DATASET = 'FB15k-237'
-epochs = 5
+epochs = 20
 lr = 0.002
 l2 = 0.00
 
-dataset = MyDataset(DATASET, label='train', load_from_disk=True)
+dataset = MyDataset(DATASET, type='train', load_from_disk=True)
 # num_true方法需要使用label_dict
 label_dict = dataset.get_label()
 train_loader = DataLoader(dataset, batch_size=128, shuffle=True)
 print('getting adj_matricx...')
 adj_matricx = dataset.data.get_adj_matricx().float().cuda()
-print('getting rel_matricx...')
-rel_matricx = dataset.data.get_rel_matricx().float().cuda()
+# print('getting rel_matricx...')
+# rel_matricx = dataset.data.get_rel_matricx().float().cuda()
 num_entity, num_relation = dataset.data.num_entity, dataset.data.num_relation
 
 X_e = torch.LongTensor([i for i in range(num_entity)]).cuda()
@@ -57,14 +57,11 @@ for epoch in range(epochs):
     model.train()
     total_num, true_num, epoch_loss = 0, 0, 0.0
     for i, sample in enumerate(train_loader):
-        e = sample['entity']
-        r = sample['relation']
-        #         e = F.one_hot(sample['entity'])
-        #         r = F.one_hot(sample['relation'])
+        e = sample['entity'].cuda()
+        r = sample['relation'].cuda()
         label = sample['label'].float().cuda()
-        e.cuda()
-        r.cuda()
-        pred = model.forward(e, r, X_e, X_r, adj_matricx, rel_matricx)
+#         pred = model.forward(e, r, X_e, adj_matricx)
+        pred = model.forward(e, r, X_e, X_r, adj_matricx)
         loss = model.loss(pred, label)
         loss.backward()
         opt.step()

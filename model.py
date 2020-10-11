@@ -3,6 +3,7 @@ import torch.nn as nn
 import math
 from torch.nn.init import xavier_normal_, xavier_uniform_
 from torch.nn import functional as F
+from torch.nn.parameter import Parameter
 
 init_emb_size = 200
 gc1_emb_size = 200
@@ -10,8 +11,7 @@ emb_dim = 100
 conv1_size = 64
 conv2_size = 128
 conv3_size = 64
-fc_size = 64*23
-
+fc_size = 64 * 23
 
 
 class GraphConvolution(nn.Module):
@@ -59,7 +59,7 @@ class IdeaModel(nn.Module):
         self.bn1 = nn.BatchNorm1d(gc1_emb_size)
         self.bn2 = nn.BatchNorm1d(emb_dim)
 
-        self.emb_r = nn.Embedding(num_relation, init_emb_size, padding_idx=0)
+        self.emb_r = nn.Embedding(num_relation, emb_dim, padding_idx=0)
         self.gc_r1 = GraphConvolution(init_emb_size, gc1_emb_size)
         self.gc_r2 = GraphConvolution(gc1_emb_size, emb_dim)
         self.bn3 = nn.BatchNorm1d(gc1_emb_size)
@@ -78,8 +78,9 @@ class IdeaModel(nn.Module):
         self.pool2 = nn.MaxPool1d(kernel_size=2)
         self.fc1 = nn.Linear(in_features=fc_size, out_features=num_entity)
 
-        self.loss = torch.nn.CrossEntropyLoss()
-        
+        #         self.loss = torch.nn.BCELoss()
+
+        self.loss = torch.nn.MSELoss()
 
     def init(self):
         xavier_normal_(self.emb_e.weight.data)
@@ -92,18 +93,17 @@ class IdeaModel(nn.Module):
     def forward(self, e1, rel, X_e, X_r, adj, rm):
         e = self.emb_e(X_e)
         e = self.bn1(self.gc_e1(e, adj))
-        e = F.relu(e)
+        #         e = F.relu(e)
         e = self.bn2(self.gc_e2(e, adj))
-        e = F.relu(e)
+        #         e = F.relu(e)
         e = e[e1]
         e = e.unsqueeze(1)
 
-
         r = self.emb_r(X_r)
-        r = self.bn3(self.gc_r1(r, rm))
-        r = F.relu(r)
-        r = self.bn4(self.gc_r2(r, rm))
-        r = F.relu(r)
+        #         r = self.bn3(self.gc_r1(r, rm))
+        #         r = F.relu(r)
+        #         r = self.bn4(self.gc_r2(r, rm))
+        #         r = F.relu(r)
         r = r[rel]
         r = r.unsqueeze(1)
 
@@ -119,7 +119,74 @@ class IdeaModel(nn.Module):
         x = F.relu(x)
         x = self.drop3(self.pool2(x))
         x = x.view(x.size(0), -1)
-        pred = self.fc1(x)
+        x = self.fc1(x)
+        pred = F.softmax(x)
+
+        return pred
+
+
+# SACN
+class SACN(torch.nn.Module):
+    def __init__(self, num_entities, num_relations):
+        super(SACN, self).__init__()
+
+        self.emb_e = torch.nn.Embedding(num_entities, 100, padding_idx=0)
+        self.gc1 = GraphConvolution(100, 150)
+        self.gc2 = GraphConvolution(150, 200)
+        self.emb_rel = torch.nn.Embedding(num_relations, 200, padding_idx=0)
+        self.inp_drop = torch.nn.Dropout(0.0)
+        self.hidden_drop = torch.nn.Dropout(0.25)
+        self.feature_map_drop = torch.nn.Dropout(0.25)
+        self.loss = torch.nn.BCELoss()
+        self.conv1 = torch.nn.Conv1d(2, 200, 5, stride=1, padding=int(
+            math.floor(5 / 2)))  # kernel size is odd, then padding = math.floor(kernel_size/2)
+        self.bn0 = torch.nn.BatchNorm1d(2)
+        self.bn1 = torch.nn.BatchNorm1d(200)
+        self.bn2 = torch.nn.BatchNorm1d(1024)
+        self.register_parameter('b', Parameter(torch.zeros(num_entities)))
+        self.fc1 = torch.nn.Linear(200 * 200, 1024)
+        self.bn3 = torch.nn.BatchNorm1d(150)
+        self.bn4 = torch.nn.BatchNorm1d(200)
+        self.bn_init = torch.nn.BatchNorm1d(100)
+        self.fc2 = torch.nn.Linear(1024, num_entities)
+
+        print(num_entities, num_relations)
+
+    def init(self):
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
+        xavier_normal_(self.gc1.weight.data)
+        xavier_normal_(self.gc2.weight.data)
+
+    def forward(self, e1, rel, X, A):
+        emb_initial = self.emb_e(X)
+        x = self.gc1(emb_initial, A)
+        x = self.bn3(x)
+        x = F.tanh(x)
+        x = F.dropout(x, 0.25, training=self.training)
+
+        x = self.bn4(self.gc2(x, A))
+        e1_embedded_all = F.tanh(x)
+        e1_embedded_all = F.dropout(e1_embedded_all, 0.25, training=self.training)
+        e1_embedded = e1_embedded_all[e1]
+        rel_embedded = self.emb_rel(rel)
+        stacked_inputs = torch.cat([e1_embedded, rel_embedded], 1)
+        stacked_inputs = self.bn0(stacked_inputs)
+        x = self.inp_drop(stacked_inputs)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.feature_map_drop(x)
+        x = x.view(128, -1)
+        x = self.fc1(x)
+        x = self.hidden_drop(x)
+        x = self.bn2(x)
+        x = self.fc2(x)
+        pred = F.softmax(x)
+
+        #         x = F.relu(x)
+        #         x = torch.mm(x, e1_embedded_all.transpose(1, 0))
+        #         pred = F.sigmoid(x)
 
         return pred
 
