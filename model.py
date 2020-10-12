@@ -62,8 +62,8 @@ class IdeaModel(nn.Module):
         self.emb_r = nn.Embedding(num_relation, emb_dim, padding_idx=0)
 #         self.gc_r1 = GraphConvolution(init_emb_size, gc1_emb_size)
 #         self.gc_r2 = GraphConvolution(gc1_emb_size, emb_dim)
-        self.bn3 = nn.BatchNorm1d(gc1_emb_size)
-        self.bn4 = nn.BatchNorm1d(emb_dim)
+#         self.bn3 = nn.BatchNorm1d(gc1_emb_size)
+#         self.bn4 = nn.BatchNorm1d(emb_dim)
 
         self.conv1 = nn.Conv1d(in_channels=2, out_channels=conv1_size, kernel_size=1)
         self.bn5 = nn.BatchNorm1d(conv1_size)
@@ -77,10 +77,11 @@ class IdeaModel(nn.Module):
         self.drop3 = nn.Dropout(p=0.5)
         self.pool2 = nn.MaxPool1d(kernel_size=2) # 64, 48
         self.fc1 = nn.Linear(in_features=fc_size, out_features=emb_dim)
+        self.bn8 = nn.BatchNorm1d(emb_dim)
 
-        #         self.loss = torch.nn.BCELoss()
-
-        self.loss = torch.nn.MSELoss()
+        self.loss = torch.nn.BCELoss()
+        #
+        # self.loss = torch.nn.MSELoss()
 
     def init(self):
         xavier_normal_(self.emb_e.weight.data)
@@ -93,9 +94,9 @@ class IdeaModel(nn.Module):
     def forward(self, e1, rel, X_e, X_r, adj):
         e = self.emb_e(X_e)
         e = self.bn1(self.gc_e1(e, adj))
-        #         e = F.relu(e)
+        # e = F.relu(e)
         emb_all = self.bn2(self.gc_e2(e, adj))
-        #         e = F.relu(e)
+        # e = F.relu(e)
         e = emb_all[e1]
         e = e.unsqueeze(1)
 
@@ -120,10 +121,10 @@ class IdeaModel(nn.Module):
         x = self.drop3(self.pool2(x))
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
-        x = self.bn2(x)
+        x = self.bn8(x)
         x = F.relu(x)
         x = torch.mm(x, emb_all.transpose(1, 0))
-        pred = F.sigmoid(x)
+        pred = torch.sigmoid(x)
         return pred
 
 
@@ -185,4 +186,67 @@ class SACN(torch.nn.Module):
         x = F.relu(x)
         x = torch.mm(x, e1_embedded_all.transpose(1, 0))
         pred = F.sigmoid(x)
+        return pred
+
+
+class KerasModel(torch.nn.Module):
+    def __init__(self, num_entity, num_rel):
+        super(KerasModel, self).__init__()
+        self.e_emb = nn.Embedding(num_entity, 200)
+        self.e_conv = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, padding=1)  # batch, 64, 200
+        self.e_bn = nn.BatchNorm1d(64)
+        self.e_lstm = nn.LSTM(input_size=64, hidden_size=128, batch_first=True)  # batch, 128, 200
+        self.e_drop = nn.Dropout(p=0.5)
+
+        self.r_emb = nn.Embedding(num_rel, 200)
+        self.r_conv = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, padding=1)  # batch, 64, 200
+        self.r_bn = nn.BatchNorm1d(64)
+        self.r_lstm = nn.LSTM(input_size=64, hidden_size=128, batch_first=True)  # batch, 128, 200
+        self.r_drop = nn.Dropout(p=0.5)
+
+        self.x_maxpool1 = nn.MaxPool1d(2)  # batch, 256, 100
+        self.x_drop1 = nn.Dropout(p=0.5)
+        self.x_conv1 = nn.Conv1d(in_channels=256, out_channels=128, kernel_size=3, padding=1)  # batch, 128, 100
+        self.x_bn = nn.BatchNorm1d(128)
+        self.x_maxpool2 = nn.MaxPool1d(2)  # batch, 128, 50
+        self.x_drop2 = nn.Dropout(p=0.5)
+        self.x_lstm = nn.LSTM(input_size=128, hidden_size=64, batch_first=True)  # batch, 64, 50
+        # self.x_conv2 = nn.Conv1d(in_channels=128, out_channels=64, kernel_size=1)
+        self.fc = nn.Linear(in_features=64*50, out_features=200)
+
+        self.loss = nn.MSELoss()
+
+    def forward(self, e1, r1, X_e, X_r):
+        e_emb = self.e_emb(X_e)
+        e = e_emb[e1]
+        e = e.unsqueeze(1)
+        e = self.e_bn(self.e_conv(e))  # batch, 64, 200
+        e = torch.relu(e)
+        e = e.transpose(1, 2)
+        e, (h, c) = self.e_lstm(e)
+        e = e.transpose(1, 2)
+        e = self.e_drop(e)
+
+        r = self.r_emb(X_r)[r1]
+        r = r.unsqueeze(1)
+        r = self.r_bn(self.r_conv(r))
+        r = torch.relu(r)
+        r = r.transpose(1, 2)
+        r, (h, c) = self.r_lstm(r)
+        r = r.transpose(1, 2)
+        r = self.r_drop(r)
+
+        x = torch.cat([e, r], dim=1)
+        x = self.x_drop1(self.x_maxpool1(x))
+        x = self.x_bn(self.x_conv1(x))
+        x = torch.relu(x)
+        x = self.x_drop2(self.x_maxpool2(x))
+        x = x.transpose(1, 2)
+        x, (h, c) = self.x_lstm(x)
+        x = x.transpose(1, 2)
+        x = x.reshape((x.size(0), -1))
+        x = self.fc(x)
+        x = torch.mm(x, e_emb.transpose(0, 1))
+        pred = torch.sigmoid(x)
+
         return pred

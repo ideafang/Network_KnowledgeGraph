@@ -1,4 +1,5 @@
 import torch
+from model import KerasModel
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from dataset.dataloader import IdeaDataset, MyDataset
@@ -39,4 +40,8 @@ if __name__ == "__main__":
     # test_label = MyDataset('FB15k-237', type='train', load_from_disk=True)
     # label_dict = test_label.get_label()
     # print(label_dict)
-    check_accuracy()
+
+    # check_accuracy()
+
+    model = KerasModel(14535, 237)
+    print()
