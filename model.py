@@ -189,6 +189,65 @@ class SACN(torch.nn.Module):
         return pred
 
 
+class testModel(torch.nn.Module):
+    def __init__(self, num_entity, num_relation):
+        super(testModel, self).__init__()
+        self.e_emb = nn.Embedding(num_entity, 256)
+        self.e_gc1 = GraphConvolution(in_features=256, out_features=256)
+        self.e_bn = nn.BatchNorm1d(256)
+
+        self.r_emb = nn.Embedding(num_relation, 256)
+        self.r_bn = nn.BatchNorm1d(256)
+
+        self.x1_1 = nn.Conv1d(in_channels=2, out_channels=64, kernel_size=1)
+        self.x2_1 = nn.Conv1d(in_channels=2, out_channels=64, kernel_size=1)
+        self.x2_2 = nn.Conv1d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
+        self.x3_1 = nn.Conv1d(in_channels=2, out_channels=64, kernel_size=1)
+        self.x3_2 = nn.Conv1d(in_channels=64, out_channels=64, kernel_size=5, padding=2)
+        self.x4_1 = nn.MaxPool1d(kernel_size=3, stride=1, padding=1)
+        self.x4_2 = nn.Conv1d(in_channels=2, out_channels=64, kernel_size=1)
+
+        self.x_mp1 = nn.MaxPool1d(kernel_size=2)
+        self.x_dp1 = nn.Dropout(p=0.5)
+        self.x_conv1 = nn.Conv1d(in_channels=256, out_channels=64, kernel_size=3, padding=1)
+        self.x_bn = nn.BatchNorm1d(64)
+        self.x_mp2 = nn.MaxPool1d(kernel_size=2)
+        self.x_dp2 = nn.Dropout(p=0.5)
+
+        self.fc = nn.Linear(in_features=64*64, out_features=256)
+
+        self.loss = nn.MSELoss()
+
+    def init(self):
+        xavier_normal_(self.e_emb.weight.data)
+        xavier_normal_(self.r_emb.weight.data)
+        xavier_normal_(self.e_gc1.weight.data)
+
+    def forward(self, e1, r1, X_e, X_r, adj):
+        e_all = self.e_bn(self.e_emb(X_e))
+        e_all = self.e_gc1(e_all, adj)
+        e_all = torch.tanh(e_all)
+        e = e_all[e1]
+        e = e.unsqueeze(1)  # batch, 1, 256
+        r_all = self.r_bn(self.r_emb(X_r))
+        r = r_all[r1]
+        r =r.unsqueeze(1)  # batch, 1, 256
+        x = torch.cat([e, r], dim=1)  # batch, 2, 256
+        x1 = torch.relu(self.x1_1(x))
+        x2 = torch.relu(self.x2_2(torch.relu(self.x2_1(x))))
+        x3 = torch.relu(self.x3_2(torch.relu(self.x3_1(x))))
+        x4 = torch.relu(self.x4_2(self.x4_1(x)))
+        x = torch.cat([x1, x2, x3, x4], dim=1)  # batch, 256, 256
+        x = self.x_dp1(self.x_mp1(x))  # batch, 256, 128
+        x = torch.relu(self.x_bn(self.x_conv1(x)))  # batch, 64, 128
+        x = self.x_dp2(self.x_mp2(x))  # batch, 64, 64
+        x = x.view(x.size(0), -1)
+        x = torch.relu(self.fc(x))
+        x = torch.mm(x, e_all.transpose(1, 0))
+        pred = torch.sigmoid(x)
+        return pred
+
+
 class KerasModel(torch.nn.Module):
     def __init__(self, num_entity, num_rel):
         super(KerasModel, self).__init__()
