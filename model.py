@@ -222,7 +222,7 @@ class KerasModel(torch.nn.Module):
         e = e.unsqueeze(1)
         e = self.e_bn(self.e_conv(e))  # batch, 64, 200
         e = torch.relu(e)
-        e = e.transpose(1, 2)
+        e = e.transpose(1, 2)  # batch, 200, 64
         e, (h, c) = self.e_lstm(e)
         e = e.transpose(1, 2)
         e = self.e_drop(e)

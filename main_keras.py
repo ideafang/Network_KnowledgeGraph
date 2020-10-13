@@ -18,29 +18,29 @@ print(train_y.shape)
 
 def MyModel(num_entity, num_rel):
     entity = Input(1)
-    x1 = Embedding(input_dim=num_entity, output_dim=200, input_length=num_entity)(entity)
-    x1 = Conv1D(filters=64, kernel_size=3, padding='valid', data_format='channels_first')(x1)
+    x1 = Embedding(input_dim=num_entity, output_dim=200, input_length=num_entity)(entity)  # 1，200
+    x1 = Conv1D(filters=64, kernel_size=3, padding='valid', data_format='channels_first')(x1)  # 64, 200
     x1 = BatchNormalization()(x1)
     x1 = Activation('relu')(x1)
-    x1 = LSTM(units=128, return_sequences=True)(x1)
+    x1 = LSTM(units=128, return_sequences=True)(x1)  # 64, 128
     x1 = Dropout(rate=0.5)(x1)
     relation = Input(1)
-    x2 = Embedding(input_dim=num_rel, output_dim=200, input_length=num_rel)(relation)
+    x2 = Embedding(input_dim=num_rel, output_dim=200, input_length=num_rel)(relation)  # 1, 200
     # x2 = tf.reshape(x2, shape=(x2.shape[0], 200, 1))
-    x2 = Conv1D(filters=64, kernel_size=3, padding='valid', data_format='channels_first')(x2)
+    x2 = Conv1D(filters=64, kernel_size=3, padding='valid', data_format='channels_first')(x2)  # 64, 200
     x2 = BatchNormalization()(x2)
     x2 = Activation('relu')(x2)
-    x2 = LSTM(units=128, return_sequences=True)(x2)
+    x2 = LSTM(units=128, return_sequences=True)(x2)  # 64, 128
     x2 = Dropout(rate=0.5)(x2)
-    x = concatenate([x1, x2], axis=1)
-    x = MaxPool1D(pool_size=2, padding='valid')(x)
+    x = concatenate([x1, x2], axis=1)  # 128, 128
+    x = MaxPool1D(pool_size=2, padding='valid')(x)  # 64, 128
     x = Dropout(rate=0.5)(x)
-    x = Conv1D(filters=128, kernel_size=3, padding='valid')(x)
-    x = Conv1D(filters=128, kernel_size=3, padding='valid')(x)
+    x = Conv1D(filters=128, kernel_size=3, padding='valid')(x)  # 64, 128
+    x = Conv1D(filters=128, kernel_size=3, padding='valid')(x)  # 64, 128
     x = BatchNormalization()(x)
-    x = MaxPool1D(pool_size=2, padding='valid')(x)
+    x = MaxPool1D(pool_size=2, padding='valid')(x)  # 32, 128
     x = Dropout(rate=0.5)(x)
-    x = LSTM(units=64, return_sequences=True)(x)
+    x = LSTM(units=64, return_sequences=True)(x)  # 32, 64
     x = Flatten()(x)
     x = Dense(num_entity, activation='sigmoid')(x)
     model = Model([entity, relation], x)
