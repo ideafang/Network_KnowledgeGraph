@@ -79,7 +79,8 @@ for epoch in range(epochs):
         loss = model.loss(pred, label)
         loss.backward()
         opt.step()
-        true_num += num_true1(pred, label)
+        # true_num += num_true1(pred, label)
+        true_num += num_true(pred, label_dict, e, r)
         total_num += label.shape[0]
         epoch_loss += loss
     train_acc = float(true_num) / float(total_num)
