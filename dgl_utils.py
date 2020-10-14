@@ -29,3 +29,14 @@ def node_norm_to_edge_norm(g, node_norm):
     g.ndata['norm'] = node_norm
     g.apply_edges(lambda edges: {'norm': edges.dst['node_norm']})
     return g.edata['norm']
+
+
+def get_adj_and_degrees(num_nodes, triples):
+    adj_list = [[] for _ in range(num_nodes)]
+    for i, triple in enumerate(triples):
+        adj_list[triple[0]].append([i, triple[2]])
+        adj_list[triple[2]].append([i, triple[0]])
+
+    degrees = np.array([len(a) for a in adj_list])
+    adj_list = [np.array(a) for a in adj_list]
+    return adj_list, degrees

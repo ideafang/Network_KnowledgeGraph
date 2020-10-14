@@ -56,6 +56,7 @@ for epoch in range(epochs):
     model.train()
     total_num, true_num, epoch_loss = 0, 0, 0.0
     for i, sample in enumerate(train_loader):
+        opt.zero_grad()
         e = sample['entity'].cuda()
         r = sample['relation'].cuda()
         label = sample['label'].float().cuda()

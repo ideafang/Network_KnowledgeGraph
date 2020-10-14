@@ -254,7 +254,7 @@ class OriginDataset(KGDataset):
         label_ = np.zeros(shape=(num_data, self.num_entity), dtype=np.int)
         for i in range(num_data):
             e1, rel = entity_[i], rel_[i]
-            label_[i][self.filter_node[type][e1][rel]] = 1
+            label_[i][self.filter_node[type][e1][rel]] = self.filter_node[type][e1][rel]
         entity_ = torch.tensor(entity_)
         rel_ = torch.tensor(rel_)
         label_ = torch.tensor(label_)
