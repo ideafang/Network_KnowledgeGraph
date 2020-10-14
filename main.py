@@ -37,7 +37,8 @@ def num_true1(batch_pred, label):
 
 DATASET = 'FB15k-237'
 epochs = 10
-lr = 0.001
+lr = 0.003
+
 
 dataset = MyDataset(DATASET, type='train', load_from_disk=True)
 valid = MyDataset(DATASET, type='valid', load_from_disk=True)

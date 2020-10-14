@@ -4,6 +4,7 @@ import math
 from torch.nn.init import xavier_normal_, xavier_uniform_
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
+from dgl.nn import GraphConv
 
 init_emb_size = 100
 gc1_emb_size = 150
@@ -194,10 +195,11 @@ class testModel(torch.nn.Module):
     def __init__(self, num_entity, num_relation):
         super(testModel, self).__init__()
         self.e_emb = nn.Embedding(num_entity, 256)
-        self.e_gc1 = GraphConvolution(in_features=256, out_features=256)
-        self.e_gc2 = GraphConvolution(in_features=256, out_features=256)
-        self.e_bn1 = nn.BatchNorm1d(256)
-        self.e_bn2 = nn.BatchNorm1d(256)
+        self.e_gc1 = GraphConv(in_feats=256, out_feats=256)
+        self.e_gc2 = GraphConv(256, 256)
+        # self.e_gc2 = GraphConvolution(in_features=256, out_features=256)
+        # self.e_bn1 = nn.BatchNorm1d(256)
+        # self.e_bn2 = nn.BatchNorm1d(256)
 
         self.r_emb = nn.Embedding(num_relation, 256)
 
@@ -228,7 +230,7 @@ class testModel(torch.nn.Module):
         xavier_normal_(self.e_gc1.weight.data)
         xavier_normal_(self.e_gc2.weight.data)
 
-    def forward(self, e1, r1, X_e, adj):
+    def forward(self, e1, r1, X_e, g):
         e_all = self.e_emb(X_e)
         e_all_1 = torch.relu(self.e_bn1(self.e_gc1(e_all, adj)))
         e_all = self.e_bn2(self.e_gc2(e_all_1, adj))

@@ -3,7 +3,7 @@ import pickle
 import os
 import torch
 from torch.utils.data import Dataset, DataLoader
-import torch.nn.functional as F
+import dgl
 
 
 # 构建一个torch.utils.data.Dataset类型的数据集， data_name为数据集名称， label可选train, valid, test
@@ -254,7 +254,7 @@ class OriginDataset(KGDataset):
         label_ = np.zeros(shape=(num_data, self.num_entity), dtype=np.int)
         for i in range(num_data):
             e1, rel = entity_[i], rel_[i]
-            label_[i][self.filter_node[type][e1][rel]] = self.filter_node[type][e1][rel]
+            label_[i][self.filter_node[type][e1][rel]] = 1
         entity_ = torch.tensor(entity_)
         rel_ = torch.tensor(rel_)
         label_ = torch.tensor(label_)
@@ -278,6 +278,18 @@ class OriginDataset(KGDataset):
                 matricx[e2][e1] = 1
         return torch.tensor(matricx)
 
+    # 构建dgl的训练图
+    def get_dgl_graph(self):
+        triples = self.triple['train']
+        g = dgl.graph(([], []))
+        g.add_nodes(self.num_entity)
+        h = [self.get_idx(edge[0], label='entity') for edge in triples]
+        t = [self.get_idx(edge[2], label='entity') for edge in triples]
+        h, t = np.concatenate((h, t)).transpose(), np.concatenate((t, h)).transpose()
+        print(h.shape)
+        g.add_edges(h, t)
+        print(f"# nodes: {self.num_entity}, # edges: {len(h)}")
+        return g
 
 
 class IdeaDataset(OriginDataset):

@@ -2,7 +2,7 @@ import torch
 from model import KerasModel
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from dataset.dataloader import IdeaDataset, MyDataset
+from dataset.dataloader import IdeaDataset, MyDataset, OriginDataset
 
 # x = torch.LongTensor([i for i in range(10)])
 # print(x)
@@ -43,5 +43,5 @@ if __name__ == "__main__":
 
     # check_accuracy()
 
-    model = KerasModel(14535, 237)
-    print()
+    test = OriginDataset('FB15k-237', load_from_disk=True)
+    g = test.get_dgl_graph()
