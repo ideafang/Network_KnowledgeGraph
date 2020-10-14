@@ -1,5 +1,5 @@
 from dataset.dataloader import MyDataset
-from model import IdeaModel, SACN, KerasModel, ConvE, testModel
+from model import IdeaModel, SACN, KerasModel, ConvE, testModel, ConvTransE
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -37,7 +37,7 @@ def num_true1(batch_pred, label):
 
 DATASET = 'FB15k-237'
 epochs = 10
-lr = 0.003
+lr = 0.001
 
 
 dataset = MyDataset(DATASET, type='train', load_from_disk=True)
@@ -46,6 +46,8 @@ valid_loader = DataLoader(valid, batch_size=128)
 # num_true方法需要使用label_dict
 label_dict = dataset.get_label()
 train_loader = DataLoader(dataset, batch_size=128, shuffle=True)
+print('getting dgl graph...')
+g = dataset.data.get_dgl_graph().to(0)
 # print('getting adj_matricx...')
 # adj_matricx = dataset.data.get_adj_matricx().float().cuda()
 # print('getting rel_matricx...')
@@ -54,7 +56,7 @@ num_entity, num_relation = dataset.data.num_entity, dataset.data.num_relation
 
 X_e = torch.LongTensor([i for i in range(num_entity)]).cuda()
 
-model = ConvE(num_entity, num_relation).cuda()
+model = testModel(num_entity, num_relation).cuda()
 
 model.init()
 total_param_size = []
@@ -71,7 +73,7 @@ for epoch in range(epochs):
         e = sample['entity'].cuda()
         r = sample['relation'].cuda()
         label = sample['label'].float().cuda()
-        pred = model.forward(e, r)
+        pred = model.forward(e, r, X_e, g)
         #         pred = model.forward(e, r, X_e, adj_matricx)
         #         pred = model.forward(e, r, X_e, adj_matricx)
         loss = model.loss(pred, label)
@@ -90,9 +92,11 @@ for epoch in range(epochs):
             e = sample['entity'].cuda()
             r = sample['relation'].cuda()
             label = sample['label'].float().cuda()
-            pred = model.forward(e, r)
+            pred = model.forward(e, r, X_e, g)
             #             pred = model.forward(e, r, X_e, adj_matricx)
             true_num += num_true1(pred, label)
             total_num += label.shape[0]
         valid_acc = float(true_num) / float(total_num)
         print(f"epoch: {epoch + 1}, valid_acc: {valid_acc}, true_num: {true_num}")
+
+

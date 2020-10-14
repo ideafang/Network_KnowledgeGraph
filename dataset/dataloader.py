@@ -16,9 +16,6 @@ class MyDataset(Dataset):
         self.type = type
         self.data = IdeaDataset(data_name, delimiter=delimiter, load_from_disk=load_from_disk)
         self.e1, self.rel, self.label = self.data.get_dataset(type=type)
-        # self.adj_matricx = self.data.get_adj_matricx()
-        # self.num_entity = self.data.num_entity
-        # self.num_relation = self.data.num_relation
 
     def __len__(self):
         return len(self.e1)
@@ -288,6 +285,7 @@ class OriginDataset(KGDataset):
         h, t = np.concatenate((h, t)).transpose(), np.concatenate((t, h)).transpose()
         print(h.shape)
         g.add_edges(h, t)
+        g = dgl.add_self_loop(g)
         print(f"# nodes: {self.num_entity}, # edges: {len(h)}")
         return g
 
