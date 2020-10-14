@@ -60,22 +60,22 @@ class IdeaModel(nn.Module):
         self.bn2 = nn.BatchNorm1d(emb_dim)
 
         self.emb_r = nn.Embedding(num_relation, emb_dim, padding_idx=0)
-#         self.gc_r1 = GraphConvolution(init_emb_size, gc1_emb_size)
-#         self.gc_r2 = GraphConvolution(gc1_emb_size, emb_dim)
-#         self.bn3 = nn.BatchNorm1d(gc1_emb_size)
-#         self.bn4 = nn.BatchNorm1d(emb_dim)
+        #         self.gc_r1 = GraphConvolution(init_emb_size, gc1_emb_size)
+        #         self.gc_r2 = GraphConvolution(gc1_emb_size, emb_dim)
+        #         self.bn3 = nn.BatchNorm1d(gc1_emb_size)
+        #         self.bn4 = nn.BatchNorm1d(emb_dim)
 
         self.conv1 = nn.Conv1d(in_channels=2, out_channels=conv1_size, kernel_size=1)
         self.bn5 = nn.BatchNorm1d(conv1_size)
         self.drop1 = nn.Dropout(p=0.5)
-        self.conv2 = nn.Conv1d(in_channels=conv1_size, out_channels=conv2_size, kernel_size=3) # 128, 198
+        self.conv2 = nn.Conv1d(in_channels=conv1_size, out_channels=conv2_size, kernel_size=3)  # 128, 198
         self.bn6 = nn.BatchNorm1d(conv2_size)
         self.drop2 = nn.Dropout(p=0.5)
-        self.pool1 = nn.MaxPool1d(kernel_size=2) # 128, 99
-        self.conv3 = nn.Conv1d(in_channels=conv2_size, out_channels=conv3_size, kernel_size=3) # 64, 97
+        self.pool1 = nn.MaxPool1d(kernel_size=2)  # 128, 99
+        self.conv3 = nn.Conv1d(in_channels=conv2_size, out_channels=conv3_size, kernel_size=3)  # 64, 97
         self.bn7 = nn.BatchNorm1d(conv3_size)
         self.drop3 = nn.Dropout(p=0.5)
-        self.pool2 = nn.MaxPool1d(kernel_size=2) # 64, 48
+        self.pool2 = nn.MaxPool1d(kernel_size=2)  # 64, 48
         self.fc1 = nn.Linear(in_features=fc_size, out_features=emb_dim)
         self.bn8 = nn.BatchNorm1d(emb_dim)
 
@@ -88,8 +88,9 @@ class IdeaModel(nn.Module):
         xavier_normal_(self.emb_r.weight.data)
         xavier_normal_(self.gc_e1.weight.data)
         xavier_normal_(self.gc_e2.weight.data)
-#         xavier_normal_(self.gc_r1.weight.data)
-#         xavier_normal_(self.gc_r2.weight.data)
+
+    #         xavier_normal_(self.gc_r1.weight.data)
+    #         xavier_normal_(self.gc_r2.weight.data)
 
     def forward(self, e1, rel, X_e, X_r, adj):
         e = self.emb_e(X_e)
@@ -141,7 +142,7 @@ class SACN(torch.nn.Module):
         self.hidden_drop = torch.nn.Dropout(0.25)
         self.feature_map_drop = torch.nn.Dropout(0.25)
         self.loss = torch.nn.BCELoss()
-        self.conv1 = torch.nn.Conv1d(2, 200, 5, stride=1, padding= int(math.floor(5/2)))
+        self.conv1 = torch.nn.Conv1d(2, 200, 5, stride=1, padding=int(math.floor(5 / 2)))
         self.bn0 = torch.nn.BatchNorm1d(2)
         self.bn1 = torch.nn.BatchNorm1d(200)
         self.bn2 = torch.nn.BatchNorm1d(200)
@@ -194,10 +195,11 @@ class testModel(torch.nn.Module):
         super(testModel, self).__init__()
         self.e_emb = nn.Embedding(num_entity, 256)
         self.e_gc1 = GraphConvolution(in_features=256, out_features=256)
-        self.e_bn = nn.BatchNorm1d(256)
+        self.e_gc2 = GraphConvolution(in_features=256, out_features=256)
+        self.e_bn1 = nn.BatchNorm1d(256)
+        self.e_bn2 = nn.BatchNorm1d(256)
 
         self.r_emb = nn.Embedding(num_relation, 256)
-        self.r_bn = nn.BatchNorm1d(256)
 
         self.x1_1 = nn.Conv1d(in_channels=2, out_channels=64, kernel_size=1)
         self.x2_1 = nn.Conv1d(in_channels=2, out_channels=64, kernel_size=1)
@@ -214,24 +216,28 @@ class testModel(torch.nn.Module):
         self.x_mp2 = nn.MaxPool1d(kernel_size=2)
         self.x_dp2 = nn.Dropout(p=0.5)
 
-        self.fc = nn.Linear(in_features=64*64, out_features=256)
+        self.fc = nn.Linear(in_features=64 * 64, out_features=256)
+        self.hidden_drop = nn.Dropout(p=0.4)
+        self.bn1 = nn.BatchNorm1d(256)
 
-        self.loss = nn.MSELoss()
+        self.loss = nn.BCELoss()
 
     def init(self):
         xavier_normal_(self.e_emb.weight.data)
         xavier_normal_(self.r_emb.weight.data)
         xavier_normal_(self.e_gc1.weight.data)
+        xavier_normal_(self.e_gc2.weight.data)
 
-    def forward(self, e1, r1, X_e, X_r, adj):
-        e_all = self.e_bn(self.e_emb(X_e))
-        e_all = self.e_gc1(e_all, adj)
-        e_all = torch.tanh(e_all)
+    def forward(self, e1, r1, X_e, adj):
+        e_all = self.e_emb(X_e)
+        e_all_1 = torch.relu(self.e_bn1(self.e_gc1(e_all, adj)))
+        e_all = self.e_bn2(self.e_gc2(e_all_1, adj))
+        e_all.add_(e_all_1)
+        e_all = torch.relu(e_all)
         e = e_all[e1]
         e = e.unsqueeze(1)  # batch, 1, 256
-        r_all = self.r_bn(self.r_emb(X_r))
-        r = r_all[r1]
-        r =r.unsqueeze(1)  # batch, 1, 256
+        r = self.r_emb(r1)  # batch, 1, 256
+        r = r.unsqueeze(1)
         x = torch.cat([e, r], dim=1)  # batch, 2, 256
         x1 = torch.relu(self.x1_1(x))
         x2 = torch.relu(self.x2_2(torch.relu(self.x2_1(x))))
@@ -242,7 +248,10 @@ class testModel(torch.nn.Module):
         x = torch.relu(self.x_bn(self.x_conv1(x)))  # batch, 64, 128
         x = self.x_dp2(self.x_mp2(x))  # batch, 64, 64
         x = x.view(x.size(0), -1)
-        x = torch.relu(self.fc(x))
+        x = self.fc(x)
+        x = self.hidden_drop(x)
+        x = self.bn1(x)
+        x = torch.relu(x)
         x = torch.mm(x, e_all.transpose(1, 0))
         pred = torch.sigmoid(x)
         return pred
@@ -253,59 +262,109 @@ class KerasModel(torch.nn.Module):
         super(KerasModel, self).__init__()
         self.e_emb = nn.Embedding(num_entity, 200)
         self.e_conv = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, padding=1)  # batch, 64, 200
-        self.e_bn = nn.BatchNorm1d(64)
-        self.e_lstm = nn.LSTM(input_size=64, hidden_size=128, batch_first=True)  # batch, 128, 200
+        self.e_bn = nn.BatchNorm1d(200)
+        self.e_lstm = nn.LSTM(input_size=200, hidden_size=128, batch_first=True)  # batch, 128, 64
         self.e_drop = nn.Dropout(p=0.5)
 
         self.r_emb = nn.Embedding(num_rel, 200)
         self.r_conv = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, padding=1)  # batch, 64, 200
-        self.r_bn = nn.BatchNorm1d(64)
-        self.r_lstm = nn.LSTM(input_size=64, hidden_size=128, batch_first=True)  # batch, 128, 200
+        self.r_bn = nn.BatchNorm1d(200)
+        self.r_lstm = nn.LSTM(input_size=200, hidden_size=128, batch_first=True)  # batch, 128, 64
         self.r_drop = nn.Dropout(p=0.5)
 
-        self.x_maxpool1 = nn.MaxPool1d(2)  # batch, 256, 100
+        self.x_maxpool1 = nn.MaxPool1d(2)  # batch, 128, 64
         self.x_drop1 = nn.Dropout(p=0.5)
-        self.x_conv1 = nn.Conv1d(in_channels=256, out_channels=128, kernel_size=3, padding=1)  # batch, 128, 100
+        self.x_conv1 = nn.Conv1d(in_channels=128, out_channels=128, kernel_size=3, padding=1)  # batch, 128, 64
         self.x_bn = nn.BatchNorm1d(128)
         self.x_maxpool2 = nn.MaxPool1d(2)  # batch, 128, 50
         self.x_drop2 = nn.Dropout(p=0.5)
-        self.x_lstm = nn.LSTM(input_size=128, hidden_size=64, batch_first=True)  # batch, 64, 50
-        # self.x_conv2 = nn.Conv1d(in_channels=128, out_channels=64, kernel_size=1)
-        self.fc = nn.Linear(in_features=64*50, out_features=200)
+        #         self.x_lstm = nn.LSTM(input_size=128, hidden_size=64, batch_first=True)  # batch, 64, 50
+        self.x_conv2 = nn.Conv1d(in_channels=128, out_channels=64, kernel_size=1)
+        self.fc = nn.Linear(in_features=64 * 32, out_features=num_entity)
 
-        self.loss = nn.MSELoss()
+        self.loss = nn.BCELoss()
 
     def forward(self, e1, r1, X_e, X_r):
         e_emb = self.e_emb(X_e)
         e = e_emb[e1]
         e = e.unsqueeze(1)
-        e = self.e_bn(self.e_conv(e))  # batch, 64, 200
+        e = self.e_conv(e)  # batch, 64, 200
+        e = e.transpose(1, 2)  # batch, 200, 64
+        e = self.e_bn(e)  # batch, 200, 64
         e = torch.relu(e)
         e = e.transpose(1, 2)  # batch, 200, 64
-        e, (h, c) = self.e_lstm(e)
-        e = e.transpose(1, 2)
+        e, (h, c) = self.e_lstm(e)  # batch, 64, 128
         e = self.e_drop(e)
+        e = e.transpose(1, 2)  # batch, 128, 64
 
         r = self.r_emb(X_r)[r1]
         r = r.unsqueeze(1)
-        r = self.r_bn(self.r_conv(r))
+        r = self.r_conv(r)  # batch, 64, 200
+        r = r.transpose(1, 2)  # batch, 200, 64
+        r = self.r_bn(r)
         r = torch.relu(r)
-        r = r.transpose(1, 2)
-        r, (h, c) = self.r_lstm(r)
-        r = r.transpose(1, 2)
+        r = r.transpose(1, 2)  # batch, 64, 200
+        r, (h, c) = self.r_lstm(r)  # batch, 64, 128
         r = self.r_drop(r)
+        r = r.transpose(1, 2)  # batch, 128, 64
 
-        x = torch.cat([e, r], dim=1)
-        x = self.x_drop1(self.x_maxpool1(x))
-        x = self.x_bn(self.x_conv1(x))
+        x = torch.cat([e, r], dim=2)  # batch, 128, 128(stack)
+        x = self.x_drop1(self.x_maxpool1(x))  # batch, 128, 64
+        x = self.x_bn(self.x_conv1(x))  # batch, 128, 64
         x = torch.relu(x)
-        x = self.x_drop2(self.x_maxpool2(x))
-        x = x.transpose(1, 2)
-        x, (h, c) = self.x_lstm(x)
-        x = x.transpose(1, 2)
+        x = self.x_drop2(self.x_maxpool2(x))  # barch, 128, 32
+        #         x = x.transpose(1, 2)
+        x = self.x_conv2(x)  # batch, 64, 32
+        #         x = x.transpose(1, 2)
         x = x.reshape((x.size(0), -1))
         x = self.fc(x)
-        x = torch.mm(x, e_emb.transpose(0, 1))
+        #         x = torch.mm(x, e_emb.transpose(0, 1))
+        pred = torch.sigmoid(x)
+
+        return pred
+
+
+class ConvE(torch.nn.Module):
+    def __init__(self, num_entities, num_relations):
+        super(ConvE, self).__init__()
+        self.emb_e = torch.nn.Embedding(num_entities, 200, padding_idx=0)
+        self.emb_rel = torch.nn.Embedding(num_relations, 200, padding_idx=0)
+        self.inp_drop = torch.nn.Dropout(0.2)
+        self.hidden_drop = torch.nn.Dropout(0.3)
+        self.feature_map_drop = torch.nn.Dropout2d(0.2)
+        self.loss = torch.nn.BCELoss()
+
+        self.conv1 = torch.nn.Conv2d(1, 32, (3, 3), 1, 0, bias=True)
+        self.bn0 = torch.nn.BatchNorm2d(1)
+        self.bn1 = torch.nn.BatchNorm2d(32)
+        self.bn2 = torch.nn.BatchNorm1d(200)
+        self.register_parameter('b', Parameter(torch.zeros(num_entities)))
+        self.fc = torch.nn.Linear(10368, 200)
+        print(num_entities, num_relations)
+
+    def init(self):
+        xavier_normal_(self.emb_e.weight.data)
+        xavier_normal_(self.emb_rel.weight.data)
+
+    def forward(self, e1, rel):
+        e1_embedded = self.emb_e(e1).view(-1, 1, 10, 20)
+        rel_embedded = self.emb_rel(rel).view(-1, 1, 10, 20)
+
+        stacked_inputs = torch.cat([e1_embedded, rel_embedded], 2)
+
+        stacked_inputs = self.bn0(stacked_inputs)
+        x = self.inp_drop(stacked_inputs)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = torch.relu(x)
+        x = self.feature_map_drop(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        x = self.hidden_drop(x)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = torch.mm(x, self.emb_e.weight.transpose(1, 0))
+        x += self.b.expand_as(x)
         pred = torch.sigmoid(x)
 
         return pred
