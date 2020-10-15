@@ -43,5 +43,9 @@ if __name__ == "__main__":
 
     # check_accuracy()
 
-    test = OriginDataset('FB15k-237', load_from_disk=True)
-    g = test.get_dgl_graph()
+    # test = OriginDataset('FB15k-237', load_from_disk=True)
+    # g = test.get_dgl_graph()
+
+    d = {'1': 0.1, '2': 0.2, '3': 0.3}
+    l = sorted(d.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
+    print(type(l[0][0]))

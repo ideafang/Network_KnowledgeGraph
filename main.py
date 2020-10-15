@@ -2,8 +2,8 @@ from dataset.dataloader import MyDataset
 from model import IdeaModel, SACN, KerasModel, ConvE, testModel, ConvTransE
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from evaluation import evalutaion
 
 
 # 判断label中的n个entity是否位于pred中值最大的n位
@@ -36,15 +36,14 @@ def num_true1(batch_pred, label):
 
 
 DATASET = 'FB15k-237'
-epochs = 10
-lr = 0.001
+epochs = 100
+lr = 0.003
 
 
 dataset = MyDataset(DATASET, type='train', load_from_disk=True)
 valid = MyDataset(DATASET, type='valid', load_from_disk=True)
-valid_loader = DataLoader(valid, batch_size=128)
 # num_true方法需要使用label_dict
-label_dict = dataset.get_label()
+filter_node = dataset.get_label()
 train_loader = DataLoader(dataset, batch_size=128, shuffle=True)
 print('getting dgl graph...')
 g = dataset.data.get_dgl_graph().to(0)
@@ -56,7 +55,7 @@ num_entity, num_relation = dataset.data.num_entity, dataset.data.num_relation
 
 X_e = torch.LongTensor([i for i in range(num_entity)]).cuda()
 
-model = testModel(num_entity, num_relation).cuda()
+model = ConvTransE(num_entity, num_relation).cuda()
 
 model.init()
 total_param_size = []
@@ -73,31 +72,33 @@ for epoch in range(epochs):
         e = sample['entity'].cuda()
         r = sample['relation'].cuda()
         label = sample['label'].float().cuda()
+        # label smoothing
+        # label = (0.9 * label) + (1.0 / label.size(1))
         pred = model.forward(e, r, X_e, g)
         #         pred = model.forward(e, r, X_e, adj_matricx)
         #         pred = model.forward(e, r, X_e, adj_matricx)
         loss = model.loss(pred, label)
         loss.backward()
         opt.step()
-        # true_num += num_true1(pred, label)
-        true_num += num_true(pred, label_dict, e, r)
+        true_num += num_true1(pred, label)
         total_num += label.shape[0]
         epoch_loss += loss
     train_acc = float(true_num) / float(total_num)
     print(f"epoch: {epoch + 1}, train_loss: {epoch_loss}, train_acc: {train_acc}, num_true1: {true_num}")
 
     model.eval()
-    with torch.no_grad():
-        total_num, true_num = 0, 0
-        for sample in valid_loader:
-            e = sample['entity'].cuda()
-            r = sample['relation'].cuda()
-            label = sample['label'].float().cuda()
-            pred = model.forward(e, r, X_e, g)
-            #             pred = model.forward(e, r, X_e, adj_matricx)
-            true_num += num_true1(pred, label)
-            total_num += label.shape[0]
-        valid_acc = float(true_num) / float(total_num)
-        print(f"epoch: {epoch + 1}, valid_acc: {valid_acc}, true_num: {true_num}")
+    evalutaion(model, valid, g, num_entity, filter_node)
+    # with torch.no_grad():
+    #     total_num, true_num = 0, 0
+    #     for sample in valid_loader:
+    #         e = sample['entity'].cuda()
+    #         r = sample['relation'].cuda()
+    #         label = sample['label'].float().cuda()
+    #         pred = model.forward(e, r, X_e, g)
+    #         #             pred = model.forward(e, r, X_e, adj_matricx)
+    #         true_num += num_true1(pred, label)
+    #         total_num += label.shape[0]
+    #     valid_acc = float(true_num) / float(total_num)
+    #     print(f"epoch: {epoch + 1}, valid_acc: {valid_acc}, true_num: {true_num}")
 
 

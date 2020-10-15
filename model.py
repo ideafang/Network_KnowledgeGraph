@@ -273,7 +273,13 @@ class ConvTransE(torch.nn.Module):
         super(ConvTransE, self).__init__()
 
         self.emb_e = torch.nn.Embedding(num_entities, 100, padding_idx=0)
-        self.gc_e = GraphConv(100, 100)
+        self.gc_e1 = GraphConv(100, 100)
+        self.bn0_e = nn.BatchNorm1d(100)
+        self.gc_e2 = GraphConv(100, 100)
+        self.bn1_e = nn.BatchNorm1d(100)
+        self.gc_e3 = GraphConv(100, 100)
+        self.bn2_e = nn.BatchNorm1d(100)
+        self.lstm_e = nn.LSTM(100, 100, 1)  # 输入特征100， 输出100， 1层
         self.emb_rel = torch.nn.Embedding(num_relations, 100, padding_idx=0)
         self.inp_drop = torch.nn.Dropout(0.0)
         self.hidden_drop = torch.nn.Dropout(0.4)
@@ -299,16 +305,23 @@ class ConvTransE(torch.nn.Module):
     def forward(self, e1, rel, X, g):
 
         emb_initial = self.emb_e(X)
-        e1_embedded_all = self.bn_init(emb_initial)
-        e1_embedded_all = self.gc_e(g, e1_embedded_all)
-        e1_embedded = e1_embedded_all[e1]
-        e1_embedded = e1_embedded.unsqueeze(1)
-        rel_embedded = self.emb_rel(rel)
-        rel_embedded = rel_embedded.unsqueeze(1)
-        stacked_inputs = torch.cat([e1_embedded, rel_embedded], 1)
+        e1_embedded_all = self.bn_init(emb_initial)  # batch, 14541, 100
+        e1_embedded_1 = self.bn0_e(self.gc_e1(g, e1_embedded_all))  # batch, 14541, 100
+        e1_embedded_d = F.dropout(e1_embedded_1, 0.25, training=self.training)
+        e1_embedded_2 = self.bn1_e(self.gc_e2(g, e1_embedded_d))  # batch, 14541, 100
+        e1_embedded_d = F.dropout(e1_embedded_2, 0.25, training=self.training)
+        e1_embedded_3 = self.bn2_e(self.gc_e3(g, e1_embedded_d))  # batch, 14541, 100
+        e1_embedded_d = F.dropout(e1_embedded_3, 0.25, training=self.training)
+        e1_embedded = torch.cat([e1_embedded_all[e1].unsqueeze(1), e1_embedded_1[e1].unsqueeze(1), e1_embedded_2[e1].unsqueeze(1), e1_embedded_3[e1].unsqueeze(1)], dim=1)  # batch, 4, 100
+        e1_embedded = e1_embedded.transpose(1, 0)  # 4, batch, 100
+        out, (h, c) = self.lstm_e(e1_embedded)  # 1, batch, 100
+        e1_embedded = h.transpose(1, 0)  # batch, 1, 100
+        rel_embedded = self.emb_rel(rel)  # batch, 100
+        rel_embedded = rel_embedded.unsqueeze(1)  # batch, 1, 100
+        stacked_inputs = torch.cat([e1_embedded, rel_embedded], 1)  # batch, 2, 100
         stacked_inputs = self.bn0(stacked_inputs)
         x= self.inp_drop(stacked_inputs)
-        x= self.conv1(x)
+        x= self.conv1(x)  # batch, 200, 200
         x= self.bn1(x)
         x= torch.relu(x)
         x = self.feature_map_drop(x)
@@ -317,7 +330,7 @@ class ConvTransE(torch.nn.Module):
         x = self.hidden_drop(x)
         x = self.bn2(x)
         x = torch.relu(x)
-        x = torch.mm(x, e1_embedded_all.transpose(1, 0))
+        x = torch.mm(x, e1_embedded_d.transpose(1, 0))
         pred = torch.sigmoid(x)
 
         return pred
@@ -358,7 +371,7 @@ class KerasModel(torch.nn.Module):
         e = e.transpose(1, 2)  # batch, 200, 64
         e = self.e_bn(e)  # batch, 200, 64
         e = torch.relu(e)
-        e = e.transpose(1, 2)  # batch, 200, 64
+        e = e.transpose(1, 2)  # batch, 64, 200
         e, (h, c) = self.e_lstm(e)  # batch, 64, 128
         e = self.e_drop(e)
         e = e.transpose(1, 2)  # batch, 128, 64
