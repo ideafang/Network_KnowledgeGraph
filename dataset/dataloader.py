@@ -16,16 +16,14 @@ class MyDataset(Dataset):
         self.type = type
         self.data = IdeaDataset(data_name, delimiter=delimiter, load_from_disk=load_from_disk)
         self.e1, self.rel, self.label = self.data.get_dataset(type=type)
+        self.filter_list = self.data.get_filter_list(self.e1, self.rel)
 
     def __len__(self):
         return len(self.e1)
 
     def __getitem__(self, item):
-        sample = {'entity': self.e1[item], 'relation': self.rel[item], 'label': self.label[item]}
+        sample = {'entity': self.e1[item], 'relation': self.rel[item], 'label': self.label[item], 'filter': self.filter_list[item]}
         return sample
-
-    def get_label(self):
-        return self.data.filter_node[self.type]
 
 
 class KGDataset():
@@ -288,6 +286,24 @@ class OriginDataset(KGDataset):
         g = dgl.add_self_loop(g)
         print(f"# nodes: {self.num_entity}, # edges: {len(h)}")
         return g
+
+    # 构建验证集和测试集中过滤节点列表
+    def get_filter_list(self, e_list, r_list):
+        '''
+        e_list, r_list type: torch.Tensor
+        '''
+        filter_list = []
+        for i in range(e_list.size(0)):
+            e1 = e_list[i].item()
+            rel = r_list[i].item()
+            if (e1 in self.filter_node['train'].keys()) and (rel in self.filter_node['train'][e1].keys()):
+                filter_list.append(self.filter_node['train'][e1][rel])
+            else:
+                filter_list.append([])
+        filter_tensor = torch.tensor(filter_list)
+        print(f"# num_samples: {e_list.size(0)}, filter_size: {filter_tensor.size()}")
+        return filter_tensor
+
 
 
 class IdeaDataset(OriginDataset):

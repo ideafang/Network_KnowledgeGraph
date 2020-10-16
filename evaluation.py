@@ -19,8 +19,7 @@ def evalutaion(model, dataset, g, num_nodes, filter_node):
         for batch_data in dataloader:
             e = batch_data['entity'].cuda()
             r = batch_data['relation'].cuda()
-            batch_pred = model.forward(e, r, X, g).cpu()
-            e, r = e.cpu(), r.cpu()
+            batch_pred = model.forward(e, r, X, g)
             for i, pred in enumerate(batch_pred):
                 # flush all known cases
                 e1, rel, pred = e[i].item(), r[i].item(), pred.numpy()
@@ -47,6 +46,33 @@ def evalutaion(model, dataset, g, num_nodes, filter_node):
 
     print(f"hits1: {float(hits1)/float(total)}, hits3: {float(hits3)/float(total)}, hit10: {float(hits10)/float(total)}")
     exit(0)
+
+def evaluation_gpu(model, dataset, g, num_nodes, filter_node):
+    '''
+        model - cuda()
+        dataset - cpu() # MyDataset
+        g - cuda() # dgl graph
+        num_nodes = num_entity
+        filter_node # a flush node dict
+        '''
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    X = torch.LongTensor([i for i in range(num_nodes)]).cuda()
+    hits1, hits3, hits10, total = 0, 0, 0, 0
+    with torch.no_grad():
+        for batch_data in dataloader:
+            e = batch_data['entity'].cuda()
+            r = batch_data['relation'].cuda()
+            batch_pred = model.forward(e, r, X, g)
+            # flush filter nodes
+            for i, pred in enumerate(batch_pred):
+                e1, rel = e[i].item(), r[i].item()
+                if e1 in filter_node.keys():
+                    if rel in filter_node[e1].keys():
+                        node_tensor = torch.tensor(filter_node[e1][rel]).cuda()
+                        pred[i][node_tensor] = 0.0
+            pred_sort = torch.sort(batch_pred, dim=-1, descending=True)[1]
+
+
 
 
 

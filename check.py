@@ -46,6 +46,12 @@ if __name__ == "__main__":
     # test = OriginDataset('FB15k-237', load_from_disk=True)
     # g = test.get_dgl_graph()
 
-    d = {'1': 0.1, '2': 0.2, '3': 0.3}
-    l = sorted(d.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
-    print(type(l[0][0]))
+    # a = [[1, 2, 3],
+    #      [2, 3, 4],
+    #      [3, 5, 4]]
+    a = [3, 5, 4, 1]
+    b = torch.tensor(a)
+    print(b)
+    c = torch.sort(b, dim=-1, descending=True)
+    print(c[0])
+    print(c[1])
