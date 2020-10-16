@@ -11,8 +11,10 @@ def num_true(batch_pred, label_list):
     num = 0
     for i, pred in enumerate(batch_pred):
         label = label_list[i]
+        length = label[0]
+        label = label[1:length+1]
         acc_flag = True
-        for _ in range(len(label)):
+        for _ in range(length):
             pred_idx = pred.argmax().item()
             if pred_idx in label:
                 pred[pred_idx] = 0
@@ -69,6 +71,7 @@ for epoch in range(epochs):
         e = sample['entity'].cuda()
         r = sample['relation'].cuda()
         label = sample['label'].float().cuda()
+        filter_node = sample['filter'].cuda()
         # label smoothing
         # label = (0.9 * label) + (1.0 / label.size(1))
         pred = model.forward(e, r, X_e, g)
@@ -90,6 +93,7 @@ for epoch in range(epochs):
             e = sample['entity'].cuda()
             r = sample['relation'].cuda()
             label = sample['label'].float().cuda()
+            label_list = sample['label_list'].cuda()
             pred = model.forward(e, r, X_e, g)
             #             pred = model.forward(e, r, X_e, adj_matricx)
             true_num += num_true1(pred, label)

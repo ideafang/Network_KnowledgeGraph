@@ -47,7 +47,7 @@ def evalutaion(model, dataset, g, num_nodes, filter_node):
     print(f"hits1: {float(hits1)/float(total)}, hits3: {float(hits3)/float(total)}, hit10: {float(hits10)/float(total)}")
     exit(0)
 
-def evaluation_gpu(model, dataset, g, num_nodes, filter_node):
+def evaluation_gpu(model, dataset, g, num_nodes):
     '''
         model - cuda()
         dataset - cpu() # MyDataset
@@ -63,18 +63,15 @@ def evaluation_gpu(model, dataset, g, num_nodes, filter_node):
             e = batch_data['entity'].cuda()
             r = batch_data['relation'].cuda()
             filter_node = batch_data['filter'].cuda()
+            label = batch_data['label_list'].cuda()
             batch_pred = model.forward(e, r, X, g)
             # flush filter nodes
             for i, pred in enumerate(batch_pred):
-                e1, rel = e[i].item(), r[i].item()
-                if e1 in filter_node.keys():
-                    if rel in filter_node[e1].keys():
-                        node_tensor = torch.tensor(filter_node[e1][rel]).cuda()
-                        pred[i][node_tensor] = 0.0
+                length = filter_node[i][0]
+                filter_list = filter_node[i][1:length+1]
+                if not length == 0:
+                    pred[i][filter_list] = 0.0
             pred_sort = torch.sort(batch_pred, dim=-1, descending=True)[1]
-
-
-
-
-
-
+            # count true number
+            for i, pred in enumerate(batch_pred):
+                pass
