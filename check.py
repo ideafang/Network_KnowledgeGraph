@@ -56,6 +56,9 @@ if __name__ == "__main__":
     # print(c[0])
     # print(c[1])
 
-    a = [1, 2]
-    a.append([])
-    print(a)
+    data = MyDataset('FB15k-237', type='test', load_from_disk=True)
+    dataloader = DataLoader(data, batch_size=128)
+    for batch in dataloader:
+        filter_node = batch['filter']
+        print(filter_node.size())
+        exit(0)

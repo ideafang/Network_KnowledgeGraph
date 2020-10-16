@@ -16,12 +16,13 @@ class MyDataset(Dataset):
         self.type = type
         self.data = IdeaDataset(data_name, delimiter=delimiter, load_from_disk=load_from_disk)
         self.e1, self.rel, self.label = self.data.get_dataset(type=type)
+        self.filter_nodes = self.data.get_filter_list(self.e1, self.rel)
 
     def __len__(self):
         return len(self.e1)
 
     def __getitem__(self, item):
-        sample = {'entity': self.e1[item], 'relation': self.rel[item], 'label': self.label[item]}
+        sample = {'entity': self.e1[item], 'relation': self.rel[item], 'label': self.label[item], 'filter': self.filter_nodes[item]}
         return sample
 
     def get_filter_nodes(self):
@@ -143,11 +144,12 @@ class OriginDataset(KGDataset):
     def __init__(self, dataset, delimiter='\t', load_from_disk=False):
         super().__init__(dataset, delimiter, load_from_disk=load_from_disk)
         self.triple = {}
+        self.train_filter_max = 0
         self.filter_node = {}
         if load_from_disk:
             if os.path.exists(f"./dataset/{self.dataset}/filter_node"):
                 print('loading filter node...')
-                self.filter_node = pickle.load(open(f"./dataset/{self.dataset}/filter_node", 'rb'))
+                self.filter_node, self.train_filter_max = pickle.load(open(f"./dataset/{self.dataset}/filter_node", 'rb'))
             else:
                 print('Error: Can not find filter_node file!')
                 exit(1)
@@ -167,6 +169,7 @@ class OriginDataset(KGDataset):
             file = ['train', 'valid', 'test']
             for p in file:
                 self.generate_filter_node(label=p)
+            self.get_train_filter_max()
             self.save_to_disk()
 
     # 由于数据集具有train, valid, test三个数据文件，因此重载read_data方法
@@ -191,21 +194,26 @@ class OriginDataset(KGDataset):
         pickle.dump([self.entity2idx, self.rel2idx, self.idx2entity, self.idx2rel], open(path, 'wb'))
         if self.filter_node:
             print("saving filter_node dict...")
-            pickle.dump(self.filter_node, open(f"./dataset/{self.dataset}/filter_node", 'wb'))
+            pickle.dump([self.filter_node, self.train_filter_max], open(f"./dataset/{self.dataset}/filter_node", 'wb'))
         if self.triple:
             print("saving triple data...")
             pickle.dump(self.triple, open(f"./dataset/{self.dataset}/triple_data", 'wb'))
 
+    # 统计filter_node['train']中最长列表
+    def get_train_filter_max(self):
+        print('counting filter_node list...')
+        for e in self.filter_node['train'].keys():
+            for r in self.filter_node['train'][e].keys():
+                if self.train_filter_max < len(self.filter_node['train'][e][r]):
+                    self.train_filter_max = len(self.filter_node['train'][e][r])
+
     # 将三元组（h, r, t）信息添加到self.filter_node中
     def add_filter_node(self, e1, rel, e2, label):
         if e1 not in self.filter_node[label].keys():
-            triple_dict = {rel: []}
-            triple_dict[rel].append(e2)
-            self.filter_node[label][e1] = triple_dict
+            self.filter_node[label][e1] = {rel: [e2]}
         else:
             if rel not in self.filter_node[label][e1].keys():
-                self.filter_node[label][e1][rel] = []
-                self.filter_node[label][e1][rel].append(e2)
+                self.filter_node[label][e1][rel] = [e2]
             else:
                 if e2 not in self.filter_node[label][e1][rel]:
                     self.filter_node[label][e1][rel].append(e2)
@@ -289,20 +297,20 @@ class OriginDataset(KGDataset):
         print(f"# nodes: {self.num_entity}, # edges: {len(h)}")
         return g
 
-    # 构建验证集和测试集中过滤节点列表
+    # 构建验证集和测试集中过滤节点列表, 每一行的第一列为所含有效节点个数
     def get_filter_list(self, e_list, r_list):
         '''
         e_list, r_list type: torch.Tensor
         '''
-        filter_list = []
+        filter_list = torch.zeros(size=(e_list.size(0), self.train_filter_max+1))
         for i in range(e_list.size(0)):
             e1 = e_list[i].item()
             rel = r_list[i].item()
             if (e1 in self.filter_node['train'].keys()) and (rel in self.filter_node['train'][e1].keys()):
-                filter_list.append(self.filter_node['train'][e1][rel])
-            else:
-                filter_list.append([])
-        print(f"# num_samples: {e_list.size(0)}, filter_size: {len(filter_list)}")
+                for j, idx in enumerate(self.filter_node['train'][e1][rel]):
+                    filter_list[i][0] = len(self.filter_node['train'][e1][rel])
+                    filter_list[i][j+1] = idx
+        print(f"# num_samples: {e_list.size(0)}, filter_size: {filter_list.size()}")
         return filter_list
 
 
