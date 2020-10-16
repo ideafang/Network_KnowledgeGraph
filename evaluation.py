@@ -62,6 +62,7 @@ def evaluation_gpu(model, dataset, g, num_nodes, filter_node):
         for batch_data in dataloader:
             e = batch_data['entity'].cuda()
             r = batch_data['relation'].cuda()
+            filter_node = batch_data['filter'].cuda()
             batch_pred = model.forward(e, r, X, g)
             # flush filter nodes
             for i, pred in enumerate(batch_pred):

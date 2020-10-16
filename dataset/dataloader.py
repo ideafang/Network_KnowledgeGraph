@@ -16,14 +16,16 @@ class MyDataset(Dataset):
         self.type = type
         self.data = IdeaDataset(data_name, delimiter=delimiter, load_from_disk=load_from_disk)
         self.e1, self.rel, self.label = self.data.get_dataset(type=type)
-        self.filter_list = self.data.get_filter_list(self.e1, self.rel)
 
     def __len__(self):
         return len(self.e1)
 
     def __getitem__(self, item):
-        sample = {'entity': self.e1[item], 'relation': self.rel[item], 'label': self.label[item], 'filter': self.filter_list[item]}
+        sample = {'entity': self.e1[item], 'relation': self.rel[item], 'label': self.label[item]}
         return sample
+
+    def get_filter_nodes(self):
+        return self.data.get_filter_list(self.e1, self.rel)
 
 
 class KGDataset():
@@ -300,9 +302,8 @@ class OriginDataset(KGDataset):
                 filter_list.append(self.filter_node['train'][e1][rel])
             else:
                 filter_list.append([])
-        filter_tensor = torch.tensor(filter_list)
-        print(f"# num_samples: {e_list.size(0)}, filter_size: {filter_tensor.size()}")
-        return filter_tensor
+        print(f"# num_samples: {e_list.size(0)}, filter_size: {len(filter_list)}")
+        return filter_list
 
 
 

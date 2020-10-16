@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from evaluation import evalutaion
 
 
-# 判断label中的n个entity是否位于pred中值最大的n位(not use)
+# 判断label中的n个entity是否位于pred中值最大的n位
 def num_true(batch_pred, label_list):
     num = 0
     for i, pred in enumerate(batch_pred):
@@ -69,7 +69,6 @@ for epoch in range(epochs):
         e = sample['entity'].cuda()
         r = sample['relation'].cuda()
         label = sample['label'].float().cuda()
-        filter_node = sample['filter'].cuda()
         # label smoothing
         # label = (0.9 * label) + (1.0 / label.size(1))
         pred = model.forward(e, r, X_e, g)
@@ -91,7 +90,6 @@ for epoch in range(epochs):
             e = sample['entity'].cuda()
             r = sample['relation'].cuda()
             label = sample['label'].float().cuda()
-            filter_node = sample['filter'].cuda()
             pred = model.forward(e, r, X_e, g)
             #             pred = model.forward(e, r, X_e, adj_matricx)
             true_num += num_true1(pred, label)

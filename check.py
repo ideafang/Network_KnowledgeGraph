@@ -49,9 +49,13 @@ if __name__ == "__main__":
     # a = [[1, 2, 3],
     #      [2, 3, 4],
     #      [3, 5, 4]]
-    a = [3, 5, 4, 1]
-    b = torch.tensor(a)
-    print(b)
-    c = torch.sort(b, dim=-1, descending=True)
-    print(c[0])
-    print(c[1])
+    # a = [3, 5, 4, 1]
+    # b = torch.tensor(a)
+    # print(b)
+    # c = torch.sort(b, dim=-1, descending=True)
+    # print(c[0])
+    # print(c[1])
+
+    a = [1, 2]
+    a.append([])
+    print(a)
