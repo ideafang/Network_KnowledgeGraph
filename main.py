@@ -3,16 +3,15 @@ from model import IdeaModel, SACN, KerasModel, ConvE, testModel, ConvTransE
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-from evaluation import evalutaion
+from evaluation import evalutaion, evaluation_gpu
 
 
 # 判断label中的n个entity是否位于pred中值最大的n位
 def num_true(batch_pred, label_list):
     num = 0
     for i, pred in enumerate(batch_pred):
-        label = label_list[i]
-        length = label[0]
-        label = label[1:length+1]
+        length = label_list[i][0]
+        label = label_list[i][1:length+1]
         acc_flag = True
         for _ in range(length):
             pred_idx = pred.argmax().item()
@@ -42,8 +41,8 @@ lr = 0.003
 
 dataset = MyDataset(DATASET, type='train', load_from_disk=True)
 valid = MyDataset(DATASET, type='valid', load_from_disk=True)
+test = MyDataset(DATASET, type='test', load_from_disk=True)
 train_loader = DataLoader(dataset, batch_size=128, shuffle=True)
-valid_loader = DataLoader(valid, batch_size=128)
 print('getting dgl graph...')
 g = dataset.data.get_dgl_graph().to(0)
 # print('getting adj_matricx...')
@@ -65,6 +64,9 @@ print(np.sum(params))
 opt = torch.optim.Adam(model.parameters(), lr=lr)
 for epoch in range(epochs):
     model.train()
+    result = open('result.txt', 'a+')
+    print(f"# Epoch: {epoch+1}")
+    result.write(f"# Epoch: {epoch+1}\ntrain: ")
     total_num, true_num, epoch_loss = 0, 0, 0.0
     for i, sample in enumerate(train_loader):
         opt.zero_grad()
@@ -75,7 +77,6 @@ for epoch in range(epochs):
         # label smoothing
         # label = (0.9 * label) + (1.0 / label.size(1))
         pred = model.forward(e, r, X_e, g)
-        #         pred = model.forward(e, r, X_e, adj_matricx)
         loss = model.loss(pred, label)
         loss.backward()
         opt.step()
@@ -83,22 +84,29 @@ for epoch in range(epochs):
         total_num += label.shape[0]
         epoch_loss += loss
     train_acc = float(true_num) / float(total_num)
-    print(f"epoch: {epoch + 1}, train_loss: {epoch_loss}, train_acc: {train_acc}, num_true1: {true_num}")
+    print(f"train_loss: {round(float(epoch_loss), 3)}, train_acc: {round(train_acc, 4)}, num_true: {true_num}")
+    result.write(f"train_loss: {round(float(epoch_loss), 3)}, train_acc: {round(train_acc, 4)}, num_true: {true_num}\n")
+    result.close()
 
     model.eval()
+    with open('result.txt', 'a+') as f:
+        f.write('valid: ')
+    evaluation_gpu(model, valid, g, num_entity)
+    if (epoch+1) % 5 == 0:
+        with open('result.txt', 'a+') as f:
+            f.write('test: ')
+        evaluation_gpu(model, test, g, num_entity)
     # evalutaion(model, valid, g, num_entity, filter_node)
-    with torch.no_grad():
-        total_num, true_num = 0, 0
-        for sample in valid_loader:
-            e = sample['entity'].cuda()
-            r = sample['relation'].cuda()
-            label = sample['label'].float().cuda()
-            label_list = sample['label_list'].cuda()
-            pred = model.forward(e, r, X_e, g)
-            #             pred = model.forward(e, r, X_e, adj_matricx)
-            true_num += num_true1(pred, label)
-            total_num += label.shape[0]
-        valid_acc = float(true_num) / float(total_num)
-        print(f"epoch: {epoch + 1}, valid_acc: {valid_acc}, true_num: {true_num}")
-
-
+    # with torch.no_grad():
+    #     total_num, true_num = 0, 0
+    #     for sample in valid_loader:
+    #         e = sample['entity'].cuda()
+    #         r = sample['relation'].cuda()
+    #         label = sample['label'].float().cuda()
+    #         label_list = sample['label_list'].cuda()
+    #         pred = model.forward(e, r, X_e, g)
+    #         #             pred = model.forward(e, r, X_e, adj_matricx)
+    #         true_num += num_true1(pred, label)
+    #         total_num += label.shape[0]
+    #     valid_acc = float(true_num) / float(total_num)
+    #     print(f"epoch: {epoch + 1}, valid_acc: {valid_acc}, true_num: {true_num}")

@@ -53,7 +53,6 @@ def evaluation_gpu(model, dataset, g, num_nodes):
         dataset - cpu() # MyDataset
         g - cuda() # dgl graph
         num_nodes = num_entity
-        filter_node # a flush node dict
         '''
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     X = torch.LongTensor([i for i in range(num_nodes)]).cuda()
@@ -70,8 +69,29 @@ def evaluation_gpu(model, dataset, g, num_nodes):
                 length = filter_node[i][0]
                 filter_list = filter_node[i][1:length+1]
                 if not length == 0:
-                    pred[i][filter_list] = 0.0
+                    pred[filter_list.long()] = 0.0
             pred_sort = torch.sort(batch_pred, dim=-1, descending=True)[1]
             # count true number
             for i, pred in enumerate(batch_pred):
-                pass
+                length = label[i][0].item()
+                sample_label = label[i][1:length+1]
+                for l in sample_label:
+                    if l == pred_sort[i][0]:
+                        hits1 += 1
+                        hits3 += 1
+                        hits10 += 1
+                    elif l in pred_sort[i][:3]:
+                        hits3 += 1
+                        hits10 += 1
+                    elif l in pred_sort[i][:10]:
+                        hits10 += 1
+                    total += 1
+    print(f"hits1: {round((float(hits1) / float(total)), 4)}, "
+          f"hits3: {round((float(hits3) / float(total)), 4)}, "
+          f"hit10: {round((float(hits10) / float(total)), 4)}, "
+          f"true_num: {hits1}")
+    with open('result.txt', 'a+') as f:
+        f.write(f"hits1: {round((float(hits1) / float(total)), 4)}, "
+          f"hits3: {round((float(hits3) / float(total)), 4)}, "
+          f"hit10: {round((float(hits10) / float(total)), 4)}, "
+          f"true_num: {hits1}\n")

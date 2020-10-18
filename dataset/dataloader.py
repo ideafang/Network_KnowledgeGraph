@@ -307,7 +307,7 @@ class OriginDataset(KGDataset):
         '''
         e_list, r_list type: torch.Tensor
         '''
-        filter_list = torch.zeros(size=(e_list.size(0), self.degree_max['train']+1))
+        filter_list = torch.zeros(size=(e_list.size(0), self.degree_max['train']+1), dtype=torch.int)
         for i in range(e_list.size(0)):
             e1 = e_list[i].item()
             rel = r_list[i].item()
@@ -315,12 +315,12 @@ class OriginDataset(KGDataset):
                 filter_list[i][0] = len(self.filter_node['train'][e1][rel])
                 for j, idx in enumerate(self.filter_node['train'][e1][rel]):
                     filter_list[i][j+1] = idx
-        print(f"# num_samples: {e_list.size(0)}, filter_size: {filter_list.size()}")
+        print(f"# num_samples: {e_list.size(0)}")
         return filter_list
 
     # 构建验证集和测试集中目标节点的列表，每一行的第一列为本行所含有效节点的个数
     def create_label_list(self, type, e_list, r_list):
-        label_list = torch.zeros(size=(e_list.size(0), self.degree_max[type]+1))
+        label_list = torch.zeros(size=(e_list.size(0), self.degree_max[type]+1), dtype=torch.int)
         for i in range(e_list.size(0)):
             e1 = e_list[i].item()
             rel = r_list[i].item()

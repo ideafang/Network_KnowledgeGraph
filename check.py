@@ -58,7 +58,11 @@ if __name__ == "__main__":
 
     data = MyDataset('FB15k-237', type='test', load_from_disk=True)
     dataloader = DataLoader(data, batch_size=128)
+    p = torch.zeros(size=(3, 14541))
     for batch in dataloader:
-        filter_node = batch['filter']
+        filter_node = batch['filter'].cuda()
         print(filter_node.size())
+        print(filter_node[0][0])
+        p[0][filter_node[0][1:12].long()] = 1.0
+        print(p[0][filter_node[0][1]])
         exit(0)
